@@ -1,0 +1,134 @@
+services:
+
+  web01:
+    build:
+      context: ./web01
+      dockerfile: Dockerfile
+    image: web01
+    container_name: web01
+    networks:
+      - asa-network
+
+  web02:
+    build:
+      context: ./web02
+      dockerfile: Dockerfile
+    image: web02
+    container_name: cnat
+    networks:
+      - asa-network
+  proxy:
+    build:
+      context: ./proxy
+      dockerfile: Dockerfile
+    image: proxy
+    container_name: proxy
+    ports:
+      - "80:80/tcp"
+      - "443:443/tcp"
+    networks:
+      - asa-network
+    depends_on:
+      - email
+      - portal
+      - nextcloud
+
+  email:
+    build:
+      context: ./email
+      dockerfile: Dockerfile
+    image: email
+    container_name: email
+    ports:
+      - "25:25/tcp"
+      - "587:587/tcp"
+      - "143:143/tcp"
+      - "993:993/tcp"
+    networks:
+      - asa-network
+  
+  sshd:
+    build: ./ssh
+    ports:
+      - "2222:22"
+    container_name: ssh-server
+    restart: always
+    command: ["sleep","infinity"]
+   # volumes:
+    #  - './Docker/Data/Ubuntu_Test:/exchange:rw'
+    networks:
+      - asa-network
+
+  dns:
+    build:
+      context: ./dns
+      dockerfile: Dockerfile
+    image: dns
+    container_name: dns
+    ports:
+      - "53:53/tcp"
+      - "53:53/udp"
+    networks:
+      - asa-network
+
+  portal:
+    image: wordpress
+    restart: always
+    container_name: portal
+   
+    environment:
+      WORDPRESS_DB_HOST: db
+      WORDPRESS_DB_USER: db_asa_user
+      WORDPRESS_DB_PASSWORD: db_asa_pass
+      WORDPRESS_DB_NAME: db_wordpress
+    networks:
+    - asa-network
+    volumes:
+      - wordpress:/var/www/html
+    depends_on:
+      - db
+
+  db:
+    image: mysql:5.7
+    restart: always
+    container_name: db
+    environment:
+      MYSQL_DATABASE: db_wordpress
+      MYSQL_USER: db_asa_user
+      MYSQL_PASSWORD: db_asa_pass
+      MYSQL_RANDOM_ROOT_PASSWORD: '1'
+
+    networks:
+    - asa-network
+    volumes:
+      - db:/var/lib/mysql
+
+  nextcloud:
+    image: nextcloud
+    container_name: nextcloud
+    restart: always
+   
+    links:
+      - db_nextcloud
+    volumes:
+      - nextcloud:/var/www/html
+    environment:
+      - MYSQL_PASSWORD=nextcloud-p@ss
+      - MYSQL_DATABASE=nextcloud
+      - MYSQL_USER=nextcloud
+      - MYSQL_HOST=db_nextcloud
+    networks:
+      - asa-network
+
+  
+
+#Docker Networks
+networks:
+  asa-network:
+    driver: bridge
+
+volumes:
+  wordpress:
+  db:
+ 
+  nextcloud:
